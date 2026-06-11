@@ -50,7 +50,7 @@ public class EmployerJobController {
             Authentication authentication
     ) {
         String currentEmail = authentication.getName();
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
 // Trong EmployerJobController.java, tìm đến hàm getMyJobs và sửa dòng gọi Service:
         Page<JobPosting> jobs = jobPostingService.getEmployerJobs(currentEmail, status, pageable);
         return ResponseEntity.ok(new ApiDataResonse<>(true, "Lấy danh sách tin đã đăng thành công", jobs, null, HttpStatus.OK));

@@ -16,5 +16,5 @@ public interface JobPostingService {
 
     // Hàm lấy danh sách cho Employer (Xem tin của chính mình dựa vào Email nhà tuyển dụng)
     Page<JobPosting> getEmployerJobs(String currentEmployerEmail, JobStatusEnum status, Pageable pageable);
-
+    JobPosting approveJobPosting(Long jobId, JobStatusEnum status);
 }

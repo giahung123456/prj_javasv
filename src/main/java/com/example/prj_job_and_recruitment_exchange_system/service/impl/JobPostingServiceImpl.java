@@ -56,4 +56,16 @@ public class JobPostingServiceImpl implements JobPostingService {
         }
         return jobPostingRepository.findByEmployerId(employer.getId(), pageable);
     }
+    @Override
+    public JobPosting approveJobPosting(Long jobId, JobStatusEnum status) {
+        // 1. Tìm bài đăng theo ID
+        JobPosting job = jobPostingRepository.findById(jobId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy bài đăng tuyển dụng với ID: " + jobId));
+
+        // 2. Cập nhật trạng thái mới (APPROVED hoặc REJECTED)
+        job.setStatus(status);
+
+        // 3. Lưu lại vào DB
+        return jobPostingRepository.save(job);
+    }
 }

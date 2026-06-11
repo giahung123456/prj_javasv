@@ -26,11 +26,11 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("Không tồn tại người dùng với email: " + email));
 
         // 2. Chuyển đổi Single RoleEnum thành cấu trúc Authority của Spring Security
-        // Thêm tiền tố "ROLE_" là chuẩn cấu hình phân quyền của Spring Security (ví dụ: ROLE_ADMIN)
-        List<GrantedAuthority> authorities = Collections.singletonList(
-                new SimpleGrantedAuthority(user.getRole().name())
-        );
 
+// ĐÃ SỬA: Thêm chữ "ROLE_" vào trước tên quyền hạn
+        List<GrantedAuthority> authorities = Collections.singletonList(
+                new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
+        );
         // 3. Build và trả về CustomUserDetails (Lưu ý gán đúng các trường đang có ở entity User)
         return CustomUserDetails.builder()
                 .username(user.getEmail())          // Dùng email làm username đăng nhập

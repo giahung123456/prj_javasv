@@ -75,10 +75,13 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public Page<User> getAllUsers(String search, RoleEnum role, Pageable pageable) {
+        String searchKey = (search == null) ? "" : search.trim();
+        // Nếu Admin truyền vào Role cụ thể (EMPLOYER hoặc CANDIDATE) thì lọc theo Role đó
         if (role != null) {
-            return userRepository.findByEmailContainingIgnoreCaseAndRole(search, role, pageable);
+            return userRepository.findByEmailContainingIgnoreCaseAndRole(searchKey, role, pageable);
         }
-        return userRepository.findByEmailContainingIgnoreCase(search, pageable);
+        // Nếu không truyền role thì tìm kiếm toàn bộ hệ thống
+        return userRepository.findByEmailContainingIgnoreCase(searchKey, pageable);
     }
 
     @Override

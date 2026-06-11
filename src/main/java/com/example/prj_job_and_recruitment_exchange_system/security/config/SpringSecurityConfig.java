@@ -31,13 +31,17 @@ public class SpringSecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) {
         httpSecurity.csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(req -> req
+                        // 1. Mở công khai các API đăng nhập, đăng ký
                         .requestMatchers("/api/v1/Job_Re_Ex/auth/**").permitAll()
-                        .requestMatchers("/api/v1/Job_Re_Ex/**").hasRole("ADMIN")
-                        // 2. ƯU TIÊN 1: Chặn riêng cụm API dành cho Nhà tuyển dụng (Employer)
-                        .requestMatchers("/api/v1/Job_Re_Ex/employer/**").hasRole("ROLE_EMPLOYER")
 
-                        // 3. ƯU TIÊN 2: Chặn riêng cụm API quản trị dành cho Ban quản trị (Admin)
+                        // 2. Định tuyến riêng cho EMPLOYER (Đưa lên trước)
+                        .requestMatchers("/api/v1/Job_Re_Ex/employer/**").hasRole("EMPLOYER")
+
+                        // 3. Định tuyến riêng cho ADMIN (Đưa lên trước)
                         .requestMatchers("/api/v1/Job_Re_Ex/admin/**").hasRole("ADMIN")
+
+                        // 4. Các cụm API chung chung hoặc của Admin tổng quát thì để ở dưới
+                        .requestMatchers("/api/v1/Job_Re_Ex/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/products/**").hasAnyRole("ADMIN","USER")
                         .anyRequest().authenticated()
                 )

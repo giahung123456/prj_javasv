@@ -37,8 +37,8 @@ public class JWTFilter extends OncePerRequestFilter {
 
     private String getTokenFromRequest(HttpServletRequest request) {
         String authorization = request.getHeader("Authorization");
-        if(authorization!=null && authorization.startsWith("Bearer")){
-            return authorization.substring(7);  // "Bearer " -> 7 kí tự
+        if(authorization!=null && authorization.startsWith("Bearer ")){
+            return authorization.substring(7).trim();  // "Bearer " -> 7 kí tự
         }
         return null;
     }
