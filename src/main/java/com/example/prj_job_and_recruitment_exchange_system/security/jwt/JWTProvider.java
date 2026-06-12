@@ -77,4 +77,18 @@ public class JWTProvider {
             throw new RuntimeException("Không lấy được username từ chuỗi token");
         }
     }
+    // Thêm hàm này vào cuối class JWTProvider.java
+    public java.util.Date getExpirationDateFromToken(String token) {
+        try {
+            SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+            return Jwts.parser()
+                    .verifyWith(key)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload()
+                    .getExpiration();
+        } catch (Exception e) {
+            throw new RuntimeException("Không lấy được thời gian hết hạn từ token");
+        }
+    }
 }

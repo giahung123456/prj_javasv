@@ -26,4 +26,5 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
 
     // 2. Tìm kiếm theo tiêu đề bài đăng chứa từ khóa (Không quan tâm trạng thái)
     Page<JobPosting> findByTitleContainingIgnoreCase(String title, Pageable pageable);
+
 }

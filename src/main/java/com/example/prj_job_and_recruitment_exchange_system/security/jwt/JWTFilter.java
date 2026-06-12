@@ -1,5 +1,6 @@
 package com.example.prj_job_and_recruitment_exchange_system.security.jwt;
 
+import com.example.prj_job_and_recruitment_exchange_system.repository.TokenBlacklistRepository;
 import com.example.prj_job_and_recruitment_exchange_system.security.principal.CustomUserDetails;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -21,10 +22,18 @@ import java.io.IOException;
 public class JWTFilter extends OncePerRequestFilter {
     private final JWTProvider jwtProvider;
     private final UserDetailsService userDetailsService;
-
+    private final TokenBlacklistRepository tokenBlacklistRepository;
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String token = getTokenFromRequest(request);
+        // THÊM ĐOẠN CHECK BLACKLIST NÀY:
+        if (token != null && tokenBlacklistRepository.existsByTokenString(token)) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.setCharacterEncoding("UTF-8");
+            response.getWriter().write("{\"error\": 401, \"message\":\"Tài khoản chưa được xác thực hoặc token đã đăng xuất\",\"path\":\"" + request.getServletPath() + "\"}");
+            return; // Chặn đứng tại đây luôn
+        }
         if(token!=null && jwtProvider.validateToken(token)){
             String username = jwtProvider.getUsernameFromToken(token);
             CustomUserDetails userDetails = (CustomUserDetails) userDetailsService.loadUserByUsername(username);

@@ -1,7 +1,5 @@
 package com.example.prj_job_and_recruitment_exchange_system.model.entity;
 
-
-
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -22,8 +20,10 @@ public class Application {
     @Column(columnDefinition = "TEXT")
     private String coverLetter;
 
-    @Column(nullable = false)
-    private String cvUrl;
+    // THAY ĐỔI TẠI ĐÂY: Liên kết trực tiếp tới CV Online vừa tạo thông qua ID
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cv_online_id", nullable = false)
+    private CvOnline cvOnline;
 
     @Column(nullable = false)
     private LocalDateTime appliedAt;

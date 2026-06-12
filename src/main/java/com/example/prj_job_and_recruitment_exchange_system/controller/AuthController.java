@@ -5,6 +5,7 @@ import com.example.prj_job_and_recruitment_exchange_system.model.entity.UserLogi
 import com.example.prj_job_and_recruitment_exchange_system.model.request.UserDTO;
 import com.example.prj_job_and_recruitment_exchange_system.model.response.ApiDataResonse;
 import com.example.prj_job_and_recruitment_exchange_system.model.response.JWTResponse;
+import com.example.prj_job_and_recruitment_exchange_system.service.AuthService;
 import com.example.prj_job_and_recruitment_exchange_system.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,18 +22,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AuthController {
     private final UserService userService;
-
-
-//    @PostMapping("/register")
-//    public ResponseEntity<ApiDataResonse<User>> registerUser(@RequestBody UserDTO userDTO) {
-//        return new ResponseEntity<>(new ApiDataResonse<>(
-//                true,
-//                "Đăng ký tài khoản " + userDTO.getEmail() + " thành công",
-//                userService.registerUser(userDTO),
-//                null,
-//                HttpStatus.CREATED
-//        ), HttpStatus.CREATED);
-//    }
+    private final AuthService authService;
 @PostMapping("/register")
 public ResponseEntity<ApiDataResonse<User>> register(@Valid @RequestBody UserDTO userDTO) {
     User registeredUser = userService.registerUser(userDTO);
@@ -58,7 +48,16 @@ public ResponseEntity<ApiDataResonse<User>> register(@Valid @RequestBody UserDTO
         ));
     }
 
-
-
+    @PostMapping("/logout")
+    public ResponseEntity<ApiDataResonse<Object>> logout(@RequestHeader("Authorization") String authHeader) {
+        authService.logout(authHeader);
+        return ResponseEntity.ok(new ApiDataResonse<>(
+                true,
+                "Đăng xuất thành công",
+                null,
+                null,
+                HttpStatus.OK
+        ));
+    }
 
 }

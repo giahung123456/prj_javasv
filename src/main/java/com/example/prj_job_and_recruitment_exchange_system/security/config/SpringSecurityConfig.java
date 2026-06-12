@@ -1,6 +1,7 @@
 package com.example.prj_job_and_recruitment_exchange_system.security.config;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -26,16 +27,23 @@ public class SpringSecurityConfig {
     private final PasswordEncoder passwordEncoder;
     private final UserDetailsService userDetailsService;
     private final JWTFilter jwtFilter;
-
+    private final JWTAuthenticationEntryPoint jwtAuthenticationEntryPoint; // THÊM DÒNG NÀY
+// THÊM DÒNG NÀY
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) {
         httpSecurity.csrf(csrf -> csrf.disable())
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                )
                 .authorizeHttpRequests(req -> req
+
                         // 1. Mở công khai các API đăng nhập, đăng ký
                         .requestMatchers("/api/v1/Job_Re_Ex/auth/**").permitAll()
-
+                        // THÊM DÒNG NÀY: Định tuyến riêng bảo vệ cụm API ứng tuyển của CANDIDATE
+                        .requestMatchers("/api/v1/Job_Re_Ex/candidate/**").hasRole("CANDIDATE")
                         // 2. Định tuyến riêng cho EMPLOYER (Đưa lên trước)
                         .requestMatchers("/api/v1/Job_Re_Ex/employer/**").hasRole("EMPLOYER")
+
 
                         // 3. Định tuyến riêng cho ADMIN (Đưa lên trước)
                         .requestMatchers("/api/v1/Job_Re_Ex/admin/**").hasRole("ADMIN")
