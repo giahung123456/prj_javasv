@@ -39,9 +39,12 @@ public class SpringSecurityConfig {
 
                         // 1. Mở công khai các API đăng nhập, đăng ký
                         .requestMatchers("/api/v1/Job_Re_Ex/auth/**").permitAll()
+                        // THÊM DÒNG NÀY: Mở quyền cho tất cả User đã đăng nhập (Candidate, Employer, Admin) đổi mật khẩu
+                        .requestMatchers("/api/v1/Job_Re_Ex/users/**").authenticated()
                         // THÊM DÒNG NÀY: Định tuyến riêng bảo vệ cụm API ứng tuyển của CANDIDATE
                         .requestMatchers("/api/v1/Job_Re_Ex/candidate/**").hasRole("CANDIDATE")
                         // 2. Định tuyến riêng cho EMPLOYER (Đưa lên trước)
+
                         .requestMatchers("/api/v1/Job_Re_Ex/employer/**").hasRole("EMPLOYER")
 
 
@@ -50,7 +53,7 @@ public class SpringSecurityConfig {
 
                         // 4. Các cụm API chung chung hoặc của Admin tổng quát thì để ở dưới
                         .requestMatchers("/api/v1/Job_Re_Ex/**").hasRole("ADMIN")
-                        .requestMatchers("/api/v1/products/**").hasAnyRole("ADMIN","USER")
+
                         .anyRequest().authenticated()
                 )
                 .cors(Customizer.withDefaults())

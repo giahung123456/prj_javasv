@@ -3,8 +3,13 @@ package com.example.prj_job_and_recruitment_exchange_system.service.impl;
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.RoleEnum;
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.User;
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.UserLoginDTO;
+import com.example.prj_job_and_recruitment_exchange_system.model.entity.UserOtp;
+import com.example.prj_job_and_recruitment_exchange_system.model.request.ChangePasswordRequest;
+import com.example.prj_job_and_recruitment_exchange_system.model.request.ForgotPasswordRequest;
+import com.example.prj_job_and_recruitment_exchange_system.model.request.ResetPasswordRequest;
 import com.example.prj_job_and_recruitment_exchange_system.model.request.UserDTO;
 import com.example.prj_job_and_recruitment_exchange_system.model.response.JWTResponse;
+import com.example.prj_job_and_recruitment_exchange_system.repository.UserOtpRepository;
 import com.example.prj_job_and_recruitment_exchange_system.repository.UserRepository;
 import com.example.prj_job_and_recruitment_exchange_system.security.jwt.JWTProvider;
 import com.example.prj_job_and_recruitment_exchange_system.security.principal.CustomUserDetails;
@@ -17,10 +22,14 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +38,7 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserOtpRepository userOtpRepository;
     private final AuthenticationManager authenticationManager; // Tiêm Bean để hỗ trợ kiểm tra tài khoản
     private final JWTProvider jwtProvider;
     @Override
@@ -114,6 +124,91 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("Email hoặc mật khẩu không chính xác!");
         }
     }
+    /**
+     * LUỒNG 1: ĐỔI MẬT KHẨU (Authenticated - Yêu cầu Token)
+     */
+    @Override
+    @Transactional
+    public void changePassword(ChangePasswordRequest request) {
+        // 1. Lấy email từ SecurityContextHolder (Do JWTFilter đã nạp vào sau khi xác thực thành công)
+        String currentEmail = SecurityContextHolder.getContext().getAuthentication().getName();
 
+        User user = userRepository.findByEmail(currentEmail)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin tài khoản đang đăng nhập!"));
+
+        // 2. Kiểm tra mật khẩu cũ (So khớp password thô và passwordHash trong DB)
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPasswordHash())) {
+            throw new RuntimeException("Mật khẩu hiện tại không chính xác!");
+        }
+
+        // 3. Kiểm tra mật khẩu mới trùng khớp xác nhận
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new RuntimeException("Mật khẩu mới và xác nhận mật khẩu không trùng khớp!");
+        }
+
+        // 4. Mã hóa mật khẩu mới và cập nhật vào trường passwordHash của bạn
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
+
+    /**
+     * LUỒNG 2.1: YÊU CẦU QUÊN MẬT KHẨU (Public - Không cần Token)
+     */
+    @Override
+    @Transactional
+    public void processForgotPassword(ForgotPasswordRequest request) {
+        // 1. Kiểm tra email có tồn tại trong hệ thống không
+        if (!userRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("Email này không tồn tại trên hệ thống RikkeiMall!");
+        }
+
+        // 2. Dọn dẹp mã OTP cũ của email này (nếu có) trước khi tạo mã mới
+        userOtpRepository.deleteByEmail(request.getEmail());
+
+        // 3. Sinh mã OTP ngẫu nhiên 6 chữ số
+        String otp = String.format("%06d", new Random().nextInt(999999));
+
+        // 4. Lưu mã OTP vào DB với thời gian hết hạn là 5 phút
+        UserOtp userOtp = UserOtp.builder()
+                .email(request.getEmail())
+                .otpCode(otp)
+                .expiryTime(LocalDateTime.now().plusMinutes(5))
+                .build();
+        userOtpRepository.save(userOtp);
+
+        // 5. Log ra màn hình Console để lấy mã test (Hoặc nhúng JavaMailSender để gửi mail ở đây)
+        log.info(" [FORGOT PASSWORD OTP] - Mã khôi phục của tài khoản {} là: {}", request.getEmail(), otp);
+    }
+
+    /**
+     * LUỒNG 2.2: XÁC THỰC OTP VÀ ĐẶT LẠI MẬT KHẨU MỚI (Public - Không cần Token)
+     */
+    @Override
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        // Do màn hình quên mật khẩu thường thực hiện theo chuỗi: Nhập email -> Nhận OTP -> Nhập OTP + Pass mới cùng lúc.
+        // Ta cần tìm thực thể OTP dựa trên mã OTP gửi lên
+        UserOtp userOtp = userOtpRepository.findAll().stream()
+                .filter(otp -> otp.getOtpCode().equals(request.getOtpCode()))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Mã OTP không chính xác!"));
+
+        // 1. Kiểm tra thời hạn OTP
+        if (userOtp.getExpiryTime().isBefore(LocalDateTime.now())) {
+            userOtpRepository.delete(userOtp);
+            throw new RuntimeException("Mã OTP này đã hết hạn sử dụng! Vui lòng yêu cầu gửi lại mã mới.");
+        }
+
+        // 2. Tìm User sở hữu email gắn liền với mã OTP đó
+        User user = userRepository.findByEmail(userOtp.getEmail())
+                .orElseThrow(() -> new RuntimeException("Tài khoản liên kết với mã OTP này không còn tồn tại!"));
+
+        // 3. Đổi mật khẩu mới
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        // 4. Xóa OTP khỏi database sau khi đã đặt lại mật khẩu thành công
+        userOtpRepository.delete(userOtp);
+    }
 
 }

@@ -2,10 +2,14 @@ package com.example.prj_job_and_recruitment_exchange_system.controller;
 
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.User;
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.UserLoginDTO;
+import com.example.prj_job_and_recruitment_exchange_system.model.request.ForgotPasswordRequest;
+import com.example.prj_job_and_recruitment_exchange_system.model.request.RefreshTokenRequest;
+import com.example.prj_job_and_recruitment_exchange_system.model.request.ResetPasswordRequest;
 import com.example.prj_job_and_recruitment_exchange_system.model.request.UserDTO;
 import com.example.prj_job_and_recruitment_exchange_system.model.response.ApiDataResonse;
 import com.example.prj_job_and_recruitment_exchange_system.model.response.JWTResponse;
 import com.example.prj_job_and_recruitment_exchange_system.service.AuthService;
+import com.example.prj_job_and_recruitment_exchange_system.service.RefreshTokenService;
 import com.example.prj_job_and_recruitment_exchange_system.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
     private final UserService userService;
     private final AuthService authService;
+    private final RefreshTokenService refreshTokenService;
 @PostMapping("/register")
 public ResponseEntity<ApiDataResonse<User>> register(@Valid @RequestBody UserDTO userDTO) {
     User registeredUser = userService.registerUser(userDTO);
@@ -57,6 +62,36 @@ public ResponseEntity<ApiDataResonse<User>> register(@Valid @RequestBody UserDTO
                 null,
                 null,
                 HttpStatus.OK
+        ));
+    }
+    // POST /api/v1/Job_Re_Ex/auth/refresh-token
+    @PostMapping("/refresh-token")
+    public ResponseEntity<ApiDataResonse<JWTResponse>> refreshTheToken(@RequestBody RefreshTokenRequest request) {
+
+        JWTResponse jwtResponse = refreshTokenService.refreshAccessToken(request);
+
+        return ResponseEntity.ok(new ApiDataResonse<>(
+                true,
+                "Làm mới mã xác thực Access Token thành công!",
+                jwtResponse,
+                null,
+                HttpStatus.OK
+        ));
+    }
+    // POST /api/v1/Job_Re_Ex/auth/forgot-password
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiDataResonse<Object>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        userService.processForgotPassword(request);
+        return ResponseEntity.ok(new ApiDataResonse<>(
+                true, "Mã OTP khôi phục mật khẩu đã được hệ thống khởi tạo thành công!", null, null, HttpStatus.OK
+        ));
+    }
+    // POST /api/v1/Job_Re_Ex/auth/reset-password
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiDataResonse<Object>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        userService.resetPassword(request);
+        return ResponseEntity.ok(new ApiDataResonse<>(
+                true, "Mật khẩu của bạn đã được làm mới thành công! Vui lòng đăng nhập lại.", null, null, HttpStatus.OK
         ));
     }
 

@@ -5,6 +5,9 @@ package com.example.prj_job_and_recruitment_exchange_system.service;
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.RoleEnum;
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.User;
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.UserLoginDTO;
+import com.example.prj_job_and_recruitment_exchange_system.model.request.ChangePasswordRequest;
+import com.example.prj_job_and_recruitment_exchange_system.model.request.ForgotPasswordRequest;
+import com.example.prj_job_and_recruitment_exchange_system.model.request.ResetPasswordRequest;
 import com.example.prj_job_and_recruitment_exchange_system.model.request.UserDTO;
 import com.example.prj_job_and_recruitment_exchange_system.model.response.JWTResponse;
 import org.springframework.data.domain.Page;
@@ -17,4 +20,7 @@ public interface UserService {
     Page<User> getAllUsers(String search, RoleEnum role, Pageable pageable);
     // THÊM HÀM NÀY:
     JWTResponse login(UserLoginDTO userLoginDTO);
+    void changePassword(ChangePasswordRequest request);
+    void processForgotPassword(ForgotPasswordRequest request);
+    void resetPassword(ResetPasswordRequest request);
 }

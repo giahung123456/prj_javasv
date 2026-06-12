@@ -16,5 +16,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // Tìm kiếm kết hợp lọc theo Role
     Page<User> findByEmailContainingIgnoreCaseAndRole(String email, RoleEnum role, Pageable pageable);
-    
+    // THÊM DÒNG NÀY ĐỂ HẾT LỖI ĐỎ:
+    boolean existsByEmail(String email);
 }
