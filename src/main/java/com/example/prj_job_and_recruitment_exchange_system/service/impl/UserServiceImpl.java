@@ -13,6 +13,7 @@ import com.example.prj_job_and_recruitment_exchange_system.repository.UserOtpRep
 import com.example.prj_job_and_recruitment_exchange_system.repository.UserRepository;
 import com.example.prj_job_and_recruitment_exchange_system.security.jwt.JWTProvider;
 import com.example.prj_job_and_recruitment_exchange_system.security.principal.CustomUserDetails;
+import com.example.prj_job_and_recruitment_exchange_system.service.RefreshTokenService;
 import com.example.prj_job_and_recruitment_exchange_system.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +42,7 @@ public class UserServiceImpl implements UserService {
     private final UserOtpRepository userOtpRepository;
     private final AuthenticationManager authenticationManager; // Tiêm Bean để hỗ trợ kiểm tra tài khoản
     private final JWTProvider jwtProvider;
+    private final RefreshTokenService refreshTokenService;
     @Override
     public User registerUser(UserDTO userDTO) {
         // 1. Kiểm tra trùng lặp email
@@ -98,7 +100,6 @@ public class UserServiceImpl implements UserService {
     public JWTResponse login(UserLoginDTO userLoginDTO) {
         try {
             // 1. Thực hiện xác thực email và password thông qua AuthenticationManager
-            // Spring Security sẽ tự kết nối sang CustomUserDetailsService để load user lên so sánh mật khẩu
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(userLoginDTO.getEmail(), userLoginDTO.getPassword())
             );
@@ -111,13 +112,19 @@ public class UserServiceImpl implements UserService {
                 throw new RuntimeException("Tài khoản của bạn đã bị khóa bởi Ban quản trị!");
             }
 
-            // 4. Tiến hành sinh chuỗi Token
+            // 4. Tiến hành sinh chuỗi Access Token (Token ngắn hạn)
             String token = jwtProvider.generateToken(userDetails);
 
-            // Lấy ra chuỗi Role thuần để trả về cho Client tiện xử lý giao diện
+            // 🔥 5. ĐÃ BỔ SUNG: Sinh Refresh Token và lưu thẳng xuống Database bảng refresh_token
+            // Lưu ý: Đảm bảo bạn đã khai báo private final RefreshTokenService refreshTokenService; ở đầu class UserServiceImpl
+            var refreshTokenEntity = refreshTokenService.createRefreshToken(userDetails.getEmail());
+
+            // 6. Lấy ra chuỗi Role thuần để trả về cho Client tiện xử lý giao diện
             String roleName = userDetails.getAuthorities().iterator().next().getAuthority();
 
-            return new JWTResponse(token, userDetails.getEmail(), roleName);
+            // 🔥 7. ĐÃ SỬA: Trả về Constructor 4 tham số chứa cả CẶP TOKEN giống như cấu trúc mới của JWTResponse
+            // Thứ tự truyền vào: token (AccessToken), refreshToken, email, roleName
+            return new JWTResponse(token, refreshTokenEntity.getToken(), userDetails.getEmail(), roleName);
 
         } catch (AuthenticationException e) {
             // Bắt các lỗi sai mật khẩu, sai email tài khoản
@@ -126,29 +133,39 @@ public class UserServiceImpl implements UserService {
     }
     /**
      * LUỒNG 1: ĐỔI MẬT KHẨU (Authenticated - Yêu cầu Token)
+     * ĐÃ SỬA: Ép kiểu và lấy Email sạch từ CustomUserDetails thay vì gọi .getName()
      */
     @Override
     @Transactional
     public void changePassword(ChangePasswordRequest request) {
-        // 1. Lấy email từ SecurityContextHolder (Do JWTFilter đã nạp vào sau khi xác thực thành công)
-        String currentEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        // 1. Lấy thông tin Principal bảo mật từ SecurityContextHolder
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        String currentEmail;
 
+        if (principal instanceof CustomUserDetails) {
+            currentEmail = ((CustomUserDetails) principal).getEmail(); // Lấy trường Email thô chuẩn xác
+        } else {
+            currentEmail = principal.toString();
+        }
+
+        // 2. Truy vấn User từ Database theo email vừa bóc tách
         User user = userRepository.findByEmail(currentEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin tài khoản đang đăng nhập!"));
 
-        // 2. Kiểm tra mật khẩu cũ (So khớp password thô và passwordHash trong DB)
+        // 3. Kiểm tra mật khẩu cũ gửi lên với mã hash trong DB
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPasswordHash())) {
             throw new RuntimeException("Mật khẩu hiện tại không chính xác!");
         }
 
-        // 3. Kiểm tra mật khẩu mới trùng khớp xác nhận
+        // 4. Kiểm tra mật khẩu mới trùng khớp xác nhận
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
             throw new RuntimeException("Mật khẩu mới và xác nhận mật khẩu không trùng khớp!");
         }
 
-        // 4. Mã hóa mật khẩu mới và cập nhật vào trường passwordHash của bạn
+        // 5. Mã hóa mật khẩu mới và cập nhật
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+        log.info("Tài khoản {} đã đổi mật khẩu thành công.", currentEmail);
     }
 
     /**
@@ -157,18 +174,18 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void processForgotPassword(ForgotPasswordRequest request) {
-        // 1. Kiểm tra email có tồn tại trong hệ thống không
+        // 1. Kiểm tra email có tồn tại không (Đã thêm hàm existsByEmail vào UserRepository trước đó)
         if (!userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email này không tồn tại trên hệ thống RikkeiMall!");
         }
 
-        // 2. Dọn dẹp mã OTP cũ của email này (nếu có) trước khi tạo mã mới
+        // 2. Dọn dẹp mã OTP cũ của email này tránh rác DB
         userOtpRepository.deleteByEmail(request.getEmail());
 
-        // 3. Sinh mã OTP ngẫu nhiên 6 chữ số
+        // 3. Sinh mã OTP ngẫu nhiên 6 chữ số từ 000000 -> 999999
         String otp = String.format("%06d", new Random().nextInt(999999));
 
-        // 4. Lưu mã OTP vào DB với thời gian hết hạn là 5 phút
+        // 4. Lưu mã OTP tạm thời có giá trị sử dụng trong vòng 5 phút
         UserOtp userOtp = UserOtp.builder()
                 .email(request.getEmail())
                 .otpCode(otp)
@@ -176,8 +193,7 @@ public class UserServiceImpl implements UserService {
                 .build();
         userOtpRepository.save(userOtp);
 
-        // 5. Log ra màn hình Console để lấy mã test (Hoặc nhúng JavaMailSender để gửi mail ở đây)
-        log.info(" [FORGOT PASSWORD OTP] - Mã khôi phục của tài khoản {} là: {}", request.getEmail(), otp);
+        log.info("[FORGOT PASSWORD OTP] - Mã khôi phục của tài khoản {} là: {}", request.getEmail(), otp);
     }
 
     /**
@@ -186,29 +202,29 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
-        // Do màn hình quên mật khẩu thường thực hiện theo chuỗi: Nhập email -> Nhận OTP -> Nhập OTP + Pass mới cùng lúc.
-        // Ta cần tìm thực thể OTP dựa trên mã OTP gửi lên
+        // Tìm thực thể OTP khớp chính xác mã code gửi lên từ Client
         UserOtp userOtp = userOtpRepository.findAll().stream()
                 .filter(otp -> otp.getOtpCode().equals(request.getOtpCode()))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Mã OTP không chính xác!"));
 
-        // 1. Kiểm tra thời hạn OTP
+        // 1. Kiểm tra thời hạn hiệu lực của mã
         if (userOtp.getExpiryTime().isBefore(LocalDateTime.now())) {
             userOtpRepository.delete(userOtp);
             throw new RuntimeException("Mã OTP này đã hết hạn sử dụng! Vui lòng yêu cầu gửi lại mã mới.");
         }
 
-        // 2. Tìm User sở hữu email gắn liền với mã OTP đó
+        // 2. Tìm User sở hữu email đi kèm với mã OTP đó
         User user = userRepository.findByEmail(userOtp.getEmail())
                 .orElseThrow(() -> new RuntimeException("Tài khoản liên kết với mã OTP này không còn tồn tại!"));
 
-        // 3. Đổi mật khẩu mới
+        // 3. Đổi mật khẩu mới sau khi đã băm BCrypt
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
 
-        // 4. Xóa OTP khỏi database sau khi đã đặt lại mật khẩu thành công
+        // 4. Tiêu hủy mã OTP ngay sau khi thực hiện khôi phục thành công
         userOtpRepository.delete(userOtp);
+        log.info("Tài khoản {} đã khôi phục mật khẩu thành công qua mã OTP.", user.getEmail());
     }
 
 }

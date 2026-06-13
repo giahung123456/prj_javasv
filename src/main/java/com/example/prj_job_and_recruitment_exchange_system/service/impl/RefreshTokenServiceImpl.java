@@ -38,41 +38,80 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         return refreshTokenRepository.save(refreshToken);
     }
 
-    @Override
-    @Transactional
-    public JWTResponse refreshAccessToken(RefreshTokenRequest request) {
-        String requestToken = request.getRefreshToken();
+//    @Override
+//    @Transactional
+//    public JWTResponse refreshAccessToken(RefreshTokenRequest request) {
+//        String requestToken = request.getRefreshToken();
+//
+//        // 1. Tìm Token trong DB
+//        RefreshToken tokenFromDb = refreshTokenRepository.findByToken(requestToken)
+//                .orElseThrow(() -> new RuntimeException("Refresh Token không tồn tại trên hệ thống!"));
+//
+//        // 2. Bảo mật: Nếu token đã từng bị thu hồi -> Xóa sạch các phiên đăng nhập cũ của user này
+//        if (tokenFromDb.isRevoked()) {
+//            refreshTokenRepository.deleteByUsername(tokenFromDb.getUsername());
+//            throw new RuntimeException("CẢNH BÁO: Refresh Token này đã từng được sử dụng! Nghi vấn rò rỉ, yêu cầu đăng nhập lại.");
+//        }
+//
+//        // 3. Kiểm tra hết hạn
+//        if (tokenFromDb.getExpiryDate().isBefore(Instant.now())) {
+//            refreshTokenRepository.delete(tokenFromDb);
+//            throw new RuntimeException("Refresh Token đã hết hạn tự nhiên. Vui lòng đăng nhập lại!");
+//        }
+//
+//        // 4. Xoay vòng Token: Vô hiệu hóa token vừa dùng
+//        tokenFromDb.setRevoked(true);
+//        refreshTokenRepository.save(tokenFromDb);
+//
+//        // 5. Lấy thông tin user để sinh Access Token mới
+//        String email = tokenFromDb.getUsername();
+//        CustomUserDetails userDetails = (CustomUserDetails) userDetailsService.loadUserByUsername(email);
+//
+//        String newAccessToken = jwtProvider.generateToken(userDetails);
+//
+//        // Trích xuất tên quyền hạn (Ví dụ: ROLE_CANDIDATE) để trả về cho Frontend tiện điều hướng
+//        String roleName = userDetails.getAuthorities().iterator().next().getAuthority();
+//
+//        // 6. Trả về đúng Constructor tùy biến của bạn: JWTResponse(token, email, role)
+//        return new JWTResponse(newAccessToken, email, roleName);
+//    }
+@Override
+@Transactional
+public JWTResponse refreshAccessToken(RefreshTokenRequest request) {
+    String requestToken = request.getRefreshToken();
 
-        // 1. Tìm Token trong DB
-        RefreshToken tokenFromDb = refreshTokenRepository.findByToken(requestToken)
-                .orElseThrow(() -> new RuntimeException("Refresh Token không tồn tại trên hệ thống!"));
+    // 1. Tìm Token trong DB
+    RefreshToken tokenFromDb = refreshTokenRepository.findByToken(requestToken)
+            .orElseThrow(() -> new RuntimeException("Refresh Token không tồn tại trên hệ thống!"));
 
-        // 2. Bảo mật: Nếu token đã từng bị thu hồi -> Xóa sạch các phiên đăng nhập cũ của user này
-        if (tokenFromDb.isRevoked()) {
-            refreshTokenRepository.deleteByUsername(tokenFromDb.getUsername());
-            throw new RuntimeException("CẢNH BÁO: Refresh Token này đã từng được sử dụng! Nghi vấn rò rỉ, yêu cầu đăng nhập lại.");
-        }
-
-        // 3. Kiểm tra hết hạn
-        if (tokenFromDb.getExpiryDate().isBefore(Instant.now())) {
-            refreshTokenRepository.delete(tokenFromDb);
-            throw new RuntimeException("Refresh Token đã hết hạn tự nhiên. Vui lòng đăng nhập lại!");
-        }
-
-        // 4. Xoay vòng Token: Vô hiệu hóa token vừa dùng
-        tokenFromDb.setRevoked(true);
-        refreshTokenRepository.save(tokenFromDb);
-
-        // 5. Lấy thông tin user để sinh Access Token mới
-        String email = tokenFromDb.getUsername();
-        CustomUserDetails userDetails = (CustomUserDetails) userDetailsService.loadUserByUsername(email);
-
-        String newAccessToken = jwtProvider.generateToken(userDetails);
-
-        // Trích xuất tên quyền hạn (Ví dụ: ROLE_CANDIDATE) để trả về cho Frontend tiện điều hướng
-        String roleName = userDetails.getAuthorities().iterator().next().getAuthority();
-
-        // 6. Trả về đúng Constructor tùy biến của bạn: JWTResponse(token, email, role)
-        return new JWTResponse(newAccessToken, email, roleName);
+    // 2. Bảo mật: Nếu token đã từng bị thu hồi -> Xóa sạch các phiên đăng nhập cũ của user này
+    if (tokenFromDb.isRevoked()) {
+        refreshTokenRepository.deleteByUsername(tokenFromDb.getUsername());
+        throw new RuntimeException("CẢNH BÁO: Refresh Token này đã từng được sử dụng! Nghi vấn rò rỉ, yêu cầu đăng nhập lại.");
     }
+
+    // 3. Kiểm tra hết hạn
+    if (tokenFromDb.getExpiryDate().isBefore(Instant.now())) {
+        refreshTokenRepository.delete(tokenFromDb);
+        throw new RuntimeException("Refresh Token đã hết hạn tự nhiên. Vui lòng đăng nhập lại!");
+    }
+
+    // 4. Xoay vòng Token: Vô hiệu hóa token cũ vừa dùng
+    tokenFromDb.setRevoked(true);
+    refreshTokenRepository.save(tokenFromDb);
+
+    // 5. Lấy thông tin user để sinh Access Token mới
+    String email = tokenFromDb.getUsername();
+    CustomUserDetails userDetails = (CustomUserDetails) userDetailsService.loadUserByUsername(email);
+    String newAccessToken = jwtProvider.generateToken(userDetails);
+
+    // ✅ ĐÃ BỔ SUNG: Dòng này lấy quyền hạn từ userDetails để truyền vào biến roleName
+    String roleName = userDetails.getAuthorities().iterator().next().getAuthority();
+
+    // 6. Sinh thêm 1 Refresh Token mới tinh để cuốn gối cho lần refresh tiếp theo
+    RefreshToken newRefreshToken = createRefreshToken(email);
+
+    // 7. Trả về đúng thứ tự tham số của Constructor (4 tham số)
+    return new JWTResponse(newAccessToken, newRefreshToken.getToken(), email, roleName);
+}
 }
