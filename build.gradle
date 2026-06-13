@@ -43,6 +43,8 @@ dependencies {
     // Source: https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-jackson
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+    // Source: https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-aop
+    implementation 'org.springframework.boot:spring-boot-starter-aop:4.0.0-M2'
 }
 
 tasks.named('test') {
