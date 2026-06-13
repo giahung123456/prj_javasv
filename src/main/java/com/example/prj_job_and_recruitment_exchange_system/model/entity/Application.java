@@ -31,7 +31,8 @@ public class Application {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ApplicationStatusEnum status;
-
+    @Column(columnDefinition = "TEXT") //  THÊM TRƯỜNG NÀY ĐỂ LƯU PHẢN HỒI
+    private String feedback;
     // Candidate nộp hồ sơ
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "candidate_id", nullable = false)

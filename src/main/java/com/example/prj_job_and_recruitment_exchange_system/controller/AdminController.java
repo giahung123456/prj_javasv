@@ -5,6 +5,7 @@ import com.example.prj_job_and_recruitment_exchange_system.model.entity.JobPosti
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.JobStatusEnum;
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.RoleEnum;
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.User;
+import com.example.prj_job_and_recruitment_exchange_system.model.request.UserAdminRequest;
 import com.example.prj_job_and_recruitment_exchange_system.model.response.ApiDataResonse;
 import com.example.prj_job_and_recruitment_exchange_system.service.JobPostingService;
 import com.example.prj_job_and_recruitment_exchange_system.service.UserService;
@@ -84,5 +85,29 @@ public class AdminController {
                 null,
                 HttpStatus.OK
         ));
+    }
+    // 2. GET BY ID - Xem chi tiết 1 người dùng
+    @GetMapping("/{id}")
+    public ResponseEntity<User> getUserById(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.getUserById(id));
+    }
+
+    // 3. CREATE - Admin thêm mới tài khoản
+    @PostMapping
+    public ResponseEntity<User> createUser(@RequestBody UserAdminRequest request) {
+        return ResponseEntity.ok(userService.createUserByAdmin(request));
+    }
+
+    // 4. UPDATE - Admin sửa thông tin hoặc Khóa/Mở khóa tài khoản
+    @PutMapping("/{id}")
+    public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody UserAdminRequest request) {
+        return ResponseEntity.ok(userService.updateUserByAdmin(id, request));
+    }
+
+    // 5. DELETE - Vô hiệu hóa tài khoản
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> deleteUser(@PathVariable Long id) {
+        userService.deleteUserByAdmin(id);
+        return ResponseEntity.ok("Đã vô hiệu hóa (xóa mềm) tài khoản người dùng thành công!");
     }
 }

@@ -5,10 +5,7 @@ package com.example.prj_job_and_recruitment_exchange_system.service;
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.RoleEnum;
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.User;
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.UserLoginDTO;
-import com.example.prj_job_and_recruitment_exchange_system.model.request.ChangePasswordRequest;
-import com.example.prj_job_and_recruitment_exchange_system.model.request.ForgotPasswordRequest;
-import com.example.prj_job_and_recruitment_exchange_system.model.request.ResetPasswordRequest;
-import com.example.prj_job_and_recruitment_exchange_system.model.request.UserDTO;
+import com.example.prj_job_and_recruitment_exchange_system.model.request.*;
 import com.example.prj_job_and_recruitment_exchange_system.model.response.JWTResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,4 +20,20 @@ public interface UserService {
     void changePassword(ChangePasswordRequest request);
     void processForgotPassword(ForgotPasswordRequest request);
     void resetPassword(ResetPasswordRequest request);
+    User getUserById(Long id);
+
+    /**
+     * CREATE: Admin chủ động tạo tài khoản mới cho nhân viên/người dùng
+     */
+    User createUserByAdmin(UserAdminRequest request);
+
+    /**
+     * UPDATE: Admin sửa thông tin, đổi role hoặc khóa/mở khóa tài khoản
+     */
+    User updateUserByAdmin(Long id, UserAdminRequest request);
+
+    /**
+     * DELETE: Admin vô hiệu hóa tài khoản (Khóa/Xóa mềm)
+     */
+    void deleteUserByAdmin(Long id);
 }

@@ -4,10 +4,7 @@ import com.example.prj_job_and_recruitment_exchange_system.model.entity.RoleEnum
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.User;
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.UserLoginDTO;
 import com.example.prj_job_and_recruitment_exchange_system.model.entity.UserOtp;
-import com.example.prj_job_and_recruitment_exchange_system.model.request.ChangePasswordRequest;
-import com.example.prj_job_and_recruitment_exchange_system.model.request.ForgotPasswordRequest;
-import com.example.prj_job_and_recruitment_exchange_system.model.request.ResetPasswordRequest;
-import com.example.prj_job_and_recruitment_exchange_system.model.request.UserDTO;
+import com.example.prj_job_and_recruitment_exchange_system.model.request.*;
 import com.example.prj_job_and_recruitment_exchange_system.model.response.JWTResponse;
 import com.example.prj_job_and_recruitment_exchange_system.repository.UserOtpRepository;
 import com.example.prj_job_and_recruitment_exchange_system.repository.UserRepository;
@@ -43,6 +40,7 @@ public class UserServiceImpl implements UserService {
     private final AuthenticationManager authenticationManager; // Tiêm Bean để hỗ trợ kiểm tra tài khoản
     private final JWTProvider jwtProvider;
     private final RefreshTokenService refreshTokenService;
+
     @Override
     public User registerUser(UserDTO userDTO) {
         // 1. Kiểm tra trùng lặp email
@@ -131,6 +129,7 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("Email hoặc mật khẩu không chính xác!");
         }
     }
+
     /**
      * LUỒNG 1: ĐỔI MẬT KHẨU (Authenticated - Yêu cầu Token)
      * ĐÃ SỬA: Ép kiểu và lấy Email sạch từ CustomUserDetails thay vì gọi .getName()
@@ -226,5 +225,73 @@ public class UserServiceImpl implements UserService {
         userOtpRepository.delete(userOtp);
         log.info("Tài khoản {} đã khôi phục mật khẩu thành công qua mã OTP.", user.getEmail());
     }
+// Đảm bảo đã inject thêm PasswordEncoder ở đầu class:
+// private final PasswordEncoder passwordEncoder;
 
+
+
+
+    @Override
+    public User getUserById(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với ID: " + id));
+    }
+
+    @Override
+    @Transactional
+    public User createUserByAdmin(UserAdminRequest request) {
+        // Kiểm tra trùng lặp email trùng khớp với thuộc tính unique của DB
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("Email này đã tồn tại trên hệ thống!");
+        }
+
+        if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
+            throw new RuntimeException("Mật khẩu tạo mới tài khoản không được để trống!");
+        }
+
+        // Tạo thực thể bằng Builder tương ứng với các thuộc tính trong file User.java của bạn
+        User newUser = User.builder()
+                .email(request.getEmail())
+                .passwordHash(passwordEncoder.encode(request.getPassword())) // Khớp trường passwordHash
+                .role(request.getRole())
+                .isActive(request.getIsActive())
+                .build();
+
+        return userRepository.save(newUser);
+    }
+
+    @Override
+    @Transactional
+    public User updateUserByAdmin(Long id, UserAdminRequest request) {
+        User existingUser = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản người dùng để cập nhật!"));
+
+        // Kiểm tra nếu admin đổi email của user sang một email khác đã tồn tại
+        if (!existingUser.getEmail().equals(request.getEmail()) && userRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("Email mới muốn cập nhật đã được sử dụng bởi tài khoản khác!");
+        }
+
+        existingUser.setEmail(request.getEmail());
+        existingUser.setRole(request.getRole());
+        existingUser.setIsActive(request.getIsActive()); // Khớp trường isActive
+
+        // Nếu admin nhập mật khẩu mới vào ô Text thì mới tiến hành băm mật khẩu gán lại
+        if (request.getPassword() != null && !request.getPassword().trim().isEmpty()) {
+            existingUser.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        }
+
+        return userRepository.save(existingUser);
+    }
+
+    @Override
+    @Transactional
+    public void deleteUserByAdmin(Long id) {
+        User existingUser = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản người dùng cần xóa!"));
+
+        // Vì User liên kết CascadeType.ALL dạng Composition với JobPosting và Application,
+        // Thay vì xóa cứng gây lỗi hoặc mất dữ liệu lịch sử hệ thống, ta thực hiện khóa tài khoản (Xóa mềm)
+        existingUser.setIsActive(false);
+        userRepository.save(existingUser);
+    }
 }
